@@ -104,6 +104,27 @@ def select_pass_targets(pool: List[str], pass_index: int, pass_size: int = 3) ->
     return targets
 
 
+def calculate_packet_loss(total: int, successful: int) -> float:
+    if total == 0:
+        return 0.0
+    return round(((total - successful) / total) * 100.0, 1)
+
+
+def calculate_jitter(pings: List[float]) -> float:
+    if len(pings) < 2:
+        return 0.0
+    jitter_sum = sum(abs(pings[i] - pings[i - 1]) for i in range(1, len(pings)))
+    return round(jitter_sum / (len(pings) - 1), 1)
+
+
+def calculate_p95(pings: List[float]) -> float:
+    if not pings:
+        return 0.0
+    sorted_pings = sorted(pings)
+    index = max(0, int(len(sorted_pings) * 0.95) - 1)
+    return round(float(sorted_pings[index]), 1)
+
+
 def probe_host(host: str, samples: int) -> Dict[str, Any]:
     safe_samples = max(3, min(samples, 16))
     try:
@@ -127,15 +148,13 @@ def probe_host(host: str, samples: int) -> Dict[str, Any]:
                 "samples": [],
             }
 
-        pings_sorted = sorted(pings)
-        p95_index = max(0, int(len(pings_sorted) * 0.95) - 1)
         return {
             "host": host,
             "reachable": True,
             "ping": round(float(result.avg_rtt), 1),
             "jitter": round(float(result.jitter), 1),
             "packet_loss": round(float(result.packet_loss), 1),
-            "p95": round(float(pings_sorted[p95_index]), 1),
+            "p95": calculate_p95(pings),
             "samples": [round(v, 1) for v in pings],
         }
     except Exception:

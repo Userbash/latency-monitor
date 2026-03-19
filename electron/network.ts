@@ -1,12 +1,11 @@
 import { Socket } from 'net';
-import { Socket } from 'net';
 
 /**
- * Интерфейс результата измерения ping.
- * @property host - адрес хоста
- * @property ping - задержка в миллисекундах
- * @property success - успешность измерения
- * @property error - описание ошибки (если есть)
+ * Ping measurement result interface.
+ * @property host - Host address
+ * @property ping - Latency in milliseconds
+ * @property success - Whether the measurement was successful
+ * @property error - Error description (if any)
  */
 export interface PingResult {
   host: string;
@@ -16,17 +15,17 @@ export interface PingResult {
 }
 
 /**
- * Интерфейс метрик сетевого теста.
- * @property testedHost - тестируемый хост
- * @property ping - средний ping
- * @property jitter - средний jitter
- * @property packetLoss - процент потерь пакетов
- * @property p95 - 95-й процентиль задержки
- * @property spikeRate - частота скачков
- * @property bufferbloat - показатель bufferbloat
- * @property status - оценка качества ('Excellent', 'Good', 'Fair', 'Poor')
- * @property score - числовой рейтинг
- * @property recommendation - рекомендация по улучшению
+ * Network test metrics interface.
+ * @property testedHost - The host that was tested
+ * @property ping - Average ping
+ * @property jitter - Average jitter
+ * @property packetLoss - Packet loss percentage
+ * @property p95 - 95th percentile latency
+ * @property spikeRate - Spike frequency
+ * @property bufferbloat - Bufferbloat metric
+ * @property status - Quality rating ('Excellent', 'Good', 'Fair', 'Poor')
+ * @property score - Numeric rating
+ * @property recommendation - Improvement recommendation
  */
 export interface NetworkMetrics {
   testedHost: string;
@@ -42,16 +41,16 @@ export interface NetworkMetrics {
 }
 
 /**
- * Этапы прогресса сетевого теста.
+ * Network test progress stages.
  */
 type ProgressStage = 'probing-targets' | 'running-samples' | 'computing-results';
 
 /**
- * Интерфейс для передачи прогресса теста.
- * @property stage - текущий этап
- * @property progress - процент выполнения
- * @property currentMetrics - текущие метрики
- * @property host - текущий хост
+ * Interface for passing test progress.
+ * @property stage - Current stage
+ * @property progress - Completion percentage
+ * @property currentMetrics - Current metrics
+ * @property host - Current host
  */
 export interface ProgressPayload {
   stage: ProgressStage;
@@ -67,10 +66,9 @@ export interface ProgressPayload {
 /**
  * Measures TCP connection time to a host:port.
  * Uses Node.js native 'net' module, compatible with Electron Main process.
- * Измеряет время установления TCP-соединения с хостом.
- * @param host - адрес хоста
- * @param port - порт (по умолчанию 80)
- * @param timeout - таймаут в мс (по умолчанию 2000)
+ * @param host - Host address
+ * @param port - Port (defaults to 80)
+ * @param timeout - Timeout in ms (defaults to 2000)
  * @returns Promise<PingResult>
  */
 export async function measureTcpPing(host: string, port = 80, timeout = 2000): Promise<PingResult> {
@@ -102,9 +100,9 @@ export async function measureTcpPing(host: string, port = 80, timeout = 2000): P
 }
 
 /**
- * Вспомогательная функция для расчёта jitter.
- * @param pings - массив задержек
- * @returns средний jitter
+ * Helper function to calculate jitter.
+ * @param pings - Array of latencies
+ * @returns Average jitter
  */
 function calculateJitterHelper(pings: number[]): number {
   if (pings.length < 2) return 0;
@@ -118,9 +116,8 @@ function calculateJitterHelper(pings: number[]): number {
 /**
  * Calculates Jitter (variation in latency).
  * Formula: Sum(|Ping_i - Ping_i-1|) / (N-1)
- * Расчёт jitter (вариация задержки).
- * @param pings - массив задержек
- * @returns средний jitter
+ * @param pings - Array of latencies
+ * @returns Average jitter
  */
 export function calculateJitter(pings: number[]): number {
   return calculateJitterHelper(pings);
@@ -128,10 +125,9 @@ export function calculateJitter(pings: number[]): number {
 
 /**
  * Calculates packet loss percentage.
- * Расчёт процента потерь пакетов.
- * @param totalRequests - всего запросов
- * @param successfulRequests - успешных запросов
- * @returns процент потерь
+ * @param totalRequests - Total number of requests
+ * @param successfulRequests - Number of successful requests
+ * @returns Loss percentage
  */
 export function calculatePacketLoss(totalRequests: number, successfulRequests: number): number {
   if (totalRequests === 0) return 0;
@@ -140,8 +136,7 @@ export function calculatePacketLoss(totalRequests: number, successfulRequests: n
 
 /**
  * Calculates P95 latency.
- * Расчёт 95-го процентиля задержки.
- * @param pings - массив задержек
+ * @param pings - Array of latencies
  * @returns p95
  */
 export function calculateP95(pings: number[]): number {

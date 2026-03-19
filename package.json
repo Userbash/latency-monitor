@@ -40,7 +40,7 @@
     "test:unit": "vitest --run",
     "test:coverage": "vitest --run --coverage",
     "test:e2e": "playwright test",
-    "test:backend": "./.venv/bin/python -m pytest -q tests/backend/test_api.py",
+    "test:backend": "PYTHONPATH=python ./.venv/bin/python3 -m pytest -q python/test_server.py",
     "test:ci": "npm run lint && npm run test:coverage",
     "build:report": "node scripts/build-report.mjs",
     "build:report:appimage": "node scripts/build-report.mjs --command \"npm run build && npx electron-builder --linux AppImage\"",

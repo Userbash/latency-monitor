@@ -36,9 +36,9 @@ if (require('electron-squirrel-startup')) {
 let mainWindow: BrowserWindow | null = null;
 
 /**
- * Создаёт главное окно приложения Electron.
- * Настраивает preload-скрипт, размеры, параметры безопасности.
- * Подключает обработчики событий для UI и безопасности.
+ * Creates the main application window for Electron.
+ * Configures the preload script, dimensions, and security parameters.
+ * Connects event handlers for UI and security.
  */
 const createWindow = () => {
   const preloadCjs = path.join(__dirname, 'preload.cjs');
@@ -75,12 +75,12 @@ const createWindow = () => {
   }
 
   mainWindow.webContents.on('context-menu', (event) => {
-    // Очищает UI в релизе, предотвращает появление стандартного меню Chromium.
+    // Clears the UI in release, prevents the standard Chromium menu from appearing.
     event.preventDefault();
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // Разрешает открытие только безопасных внешних ссылок.
+    // Allows opening only safe external links.
     if (isAllowedExternalUrl(url)) {
       void shell.openExternal(url);
     }
@@ -88,7 +88,7 @@ const createWindow = () => {
   });
 
   mainWindow.webContents.on('before-input-event', (_event, input) => {
-    // Горячие клавиши для DevTools (F12 или Ctrl+Shift+I).
+    // Hotkeys for DevTools (F12 or Ctrl+Shift+I).
     const isDevToolsShortcut =
       input.key === 'F12' ||
       (input.control && input.shift && (input.key.toLowerCase() === 'i'));
@@ -111,14 +111,14 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 /**
- * Событие готовности приложения.
- * Создаёт окно и регистрирует IPC-обработчики.
+ * Application ready event.
+ * Creates the window and registers IPC handlers.
  */
 app.whenReady().then(() => {
   createWindow();
 
   /**
-   * IPC: Управление окном (минимизация, максимизация, закрытие).
+   * IPC: Window management (minimize, maximize, close).
    */
   ipcMain.on('window-controls', (event, command) => {
     if (!mainWindow) return;
@@ -140,8 +140,8 @@ app.whenReady().then(() => {
   });
 
   /**
-   * IPC: Запуск сетевого теста.
-   * @param profile - профиль с целями и количеством замеров
+   * IPC: Launch network test.
+   * @param profile - Profile containing targets and sample count
    */
   ipcMain.on('start-network-test', async (event, profile) => {
     const targets = Array.isArray(profile?.targets) ? profile.targets : [profile?.host || '8.8.8.8'];
@@ -161,8 +161,8 @@ app.whenReady().then(() => {
   });
 
   /**
-   * IPC: Открытие внешней ссылки.
-   * @param rawUrl - URL
+   * IPC: Open external link.
+   * @param rawUrl - URL to open
    */
   ipcMain.handle('open-external', async (_event, rawUrl: string) => {
     if (!isAllowedExternalUrl(rawUrl)) {
@@ -174,7 +174,7 @@ app.whenReady().then(() => {
   });
 
   /**
-   * IPC: Захват скриншота окна.
+   * IPC: Capture window screenshot.
    */
   ipcMain.handle('capture-screenshot', async () => {
     if (!mainWindow) {

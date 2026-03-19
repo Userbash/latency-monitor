@@ -3,6 +3,9 @@
 Esports Network Monitor is a production-oriented hybrid desktop platform for game-network diagnostics.
 It combines a modern web dashboard with native desktop runtime and deterministic backend measurement logic.
 
+## Product Preview
+![Esports Network Monitor Screenshot](images/work.jpg)
+
 This repository is prepared for publication with:
 - a cleaned project structure
 - a single canonical documentation source (`README.md`)
