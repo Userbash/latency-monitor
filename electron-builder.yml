@@ -1,0 +1,17 @@
+appId: com.esports.networkmonitor
+productName: Esports Network Monitor
+directories:
+  output: dist
+  buildResources: build
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+win:
+  target:
+    - nsis
+    - portable
+linux:
+  target:
+    - AppImage
+  category: Network;Utility

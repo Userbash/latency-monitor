@@ -1,0 +1,23 @@
+c,jhrb version: "3.9"
+
+services:
+  app-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: esports-network-monitor-api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  web-dev:
+    image: node:20-alpine
+    container_name: esports-network-monitor-web-dev
+    working_dir: /workspace
+    command: sh -c "npm ci && npm run dev:web -- --host 0.0.0.0 --port 5173"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./:/workspace
+    profiles:
+      - dev
