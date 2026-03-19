@@ -30,6 +30,7 @@ interface Window {
     windowControl: (command: 'minimize' | 'maximize' | 'close') => void;
     startNetworkTest: (profile: { host?: string; targets?: string[]; samples?: number }) => void;
     openExternal: (url: string) => Promise<{ ok: boolean; error?: string }>;
+    getSystemLocale: () => Promise<string>;
     captureScreenshot: () => Promise<{ ok: boolean; path?: string; error?: string }>;
     onTestProgress: (callback: (data: ProgressEventPayload) => void) => () => void;
     onTestComplete: (callback: (results: NetworkMetrics) => void) => () => void;

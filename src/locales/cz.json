@@ -1,0 +1,60 @@
+{
+  "appTitle": "Esports Network Monitor",
+  "startTest": "Start Network Test",
+  "running": "Running",
+  "idle": "Idle",
+  "finished": "Finished",
+  "quality": "Connection Quality",
+  "recommendation": "Recommendation",
+  "profile": "Game Profile",
+  "testedHost": "Tested Host",
+  "mode": "Mode",
+  "server": "Server Pool",
+  "serverAuto": "Auto rotate",
+  "nightMode": "Night mode",
+  "topLabel": "Esports Network Monitor",
+  "normalMode": "Games",
+  "socialMode": "Social",
+  "stage": "Stage",
+  "stageMap": {
+    "probing-targets": "Finding closest route",
+    "running-samples": "Collecting samples",
+    "computing-results": "Computing final score"
+  },
+  "lang": "Language",
+  "theme": "Theme",
+  "screenshot": "Screenshot",
+  "orange": "Orange",
+  "mono": "Mono",
+  "runHint": "Run a test to evaluate gaming network quality.",
+  "metrics": {
+    "ping": "Ping",
+    "jitter": "Jitter",
+    "packetLoss": "Packet Loss",
+    "p95": "P95 Latency",
+    "spikeRate": "Spike Rate",
+    "bufferbloat": "Bufferbloat",
+    "score": "Score"
+  },
+  "units": {
+    "ms": "ms",
+    "percent": "%"
+  },
+  "tooltips": {
+    "ping": "Average latency. Lower is better.",
+    "jitter": "Latency variation between packets.",
+    "packetLoss": "Percentage of lost packets.",
+    "p95": "95th percentile latency.",
+    "spikeRate": "Share of high-latency spikes.",
+    "bufferbloat": "Extra latency under load.",
+    "score": "Final quality score from 0 to 100."
+  },
+  "errors": {
+    "backend": "Backend is not reachable",
+    "externalLink": "Cannot open external link",
+    "screenshot": "Screenshot failed",
+    "screenshotUnavailable": "Screenshot is available only in desktop mode",
+    "screenshotCanceled": "Screenshot saving was canceled"
+  },
+  "screenshotSaved": "Screenshot saved"
+}

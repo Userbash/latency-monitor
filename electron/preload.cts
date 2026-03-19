@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   openExternal: (url: string): Promise<OpenExternalResult> => ipcRenderer.invoke('open-external', url),
 
+  getSystemLocale: (): Promise<string> => ipcRenderer.invoke('get-system-locale'),
+
   captureScreenshot: (): Promise<ScreenshotResult> => ipcRenderer.invoke('capture-screenshot'),
 
   onTestProgress: (

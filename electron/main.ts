@@ -174,6 +174,18 @@ app.whenReady().then(() => {
   });
 
   /**
+   * IPC: Resolve system locale from OS settings.
+   */
+  ipcMain.handle('get-system-locale', () => {
+    const preferred = app.getPreferredSystemLanguages();
+    if (preferred.length > 0) {
+      return preferred[0];
+    }
+
+    return app.getLocale();
+  });
+
+  /**
    * IPC: Capture window screenshot.
    */
   ipcMain.handle('capture-screenshot', async () => {

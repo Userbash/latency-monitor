@@ -1,19 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { WindowControls } from './components/WindowControls';
+import enLocale from './locales/en.json';
+import ruLocale from './locales/ru.json';
+import zhLocale from './locales/zh.json';
+import czLocale from './locales/cz.json';
 
-type Language = 'en' | 'ru' | 'zh';
+type Language = 'en' | 'ru' | 'zh' | 'cz';
 type Mode = 'normal' | 'social';
 type ServerSelection = 'auto' | string;
 
 type Profile = {
   id: string;
-  label: Record<Language, string>;
+  label: Partial<Record<Language, string>> & { en: string };
   targets: string[];
 };
 
 type SocialLink = {
   id: string;
-  label: Record<Language, string>;
+  label: Partial<Record<Language, string>> & { en: string };
   url: string;
   icon?: string;
 };
@@ -166,187 +170,23 @@ const topContactLinks: SocialLink[] = [
 ];
 
 const i18n = {
-  en: {
-    appTitle: 'Esports Network Monitor',
-    startTest: 'Start Network Test',
-    running: 'Running',
-    idle: 'Idle',
-    finished: 'Finished',
-    quality: 'Connection Quality',
-    recommendation: 'Recommendation',
-    profile: 'Game Profile',
-    testedHost: 'Tested Host',
-    mode: 'Mode',
-    server: 'Server Pool',
-    serverAuto: 'Auto rotate',
-    nightMode: 'Night mode',
-    topLabel: 'Esports Network Monitor',
-    normalMode: 'Games',
-    socialMode: 'Social',
-    stage: 'Stage',
-    stageMap: {
-      'probing-targets': 'Finding closest route',
-      'running-samples': 'Collecting samples',
-      'computing-results': 'Computing final score',
-    },
-    lang: 'Language',
-    theme: 'Theme',
-    screenshot: 'Screenshot',
-    orange: 'Orange',
-    mono: 'Mono',
-    runHint: 'Run a test to evaluate gaming network quality.',
-    metrics: {
-      ping: 'Ping',
-      jitter: 'Jitter',
-      packetLoss: 'Packet Loss',
-      p95: 'P95 Latency',
-      spikeRate: 'Spike Rate',
-      bufferbloat: 'Bufferbloat',
-      score: 'Score',
-    },
-    units: {
-      ms: 'ms',
-      percent: '%',
-    },
-    tooltips: {
-      ping: 'Average latency. Lower is better.',
-      jitter: 'Latency variation between packets.',
-      packetLoss: 'Percentage of lost packets.',
-      p95: '95th percentile latency.',
-      spikeRate: 'Share of high-latency spikes.',
-      bufferbloat: 'Extra latency under load.',
-      score: 'Final quality score from 0 to 100.',
-    },
-    errors: {
-      backend: 'Backend is not reachable',
-      externalLink: 'Cannot open external link',
-      screenshot: 'Screenshot failed',
-      screenshotUnavailable: 'Screenshot is available only in desktop mode',
-      screenshotCanceled: 'Screenshot saving was canceled',
-    },
-    screenshotSaved: 'Screenshot saved',
-  },
-  ru: {
-    appTitle: 'Esports Network Monitor',
-    startTest: 'Start Network Test',
-    running: 'Running',
-    idle: 'Idle',
-    finished: 'Finished',
-    quality: 'Connection Quality',
-    recommendation: 'Recommendation',
-    profile: 'Game Profile',
-    testedHost: 'Tested Host',
-    mode: 'Mode',
-    server: 'Server Pool',
-    serverAuto: 'Auto rotate',
-    nightMode: 'Night mode',
-    topLabel: 'Esports Network Monitor',
-    normalMode: 'Games',
-    socialMode: 'Social',
-    stage: 'Stage',
-    stageMap: {
-      'probing-targets': 'Finding closest route',
-      'running-samples': 'Collecting samples',
-      'computing-results': 'Computing final score',
-    },
-    lang: 'Language',
-    theme: 'Theme',
-    screenshot: 'Screenshot',
-    orange: 'Orange',
-    mono: 'Mono',
-    runHint: 'Run a test to evaluate gaming network quality.',
-    metrics: {
-      ping: 'Ping',
-      jitter: 'Jitter',
-      packetLoss: 'Packet Loss',
-      p95: 'P95 Latency',
-      spikeRate: 'Spike Rate',
-      bufferbloat: 'Bufferbloat',
-      score: 'Score',
-    },
-    units: {
-      ms: 'ms',
-      percent: '%',
-    },
-    tooltips: {
-      ping: 'Average latency. Lower is better.',
-      jitter: 'Latency variation between packets.',
-      packetLoss: 'Percentage of lost packets.',
-      p95: '95th percentile latency.',
-      spikeRate: 'Share of high-latency spikes.',
-      bufferbloat: 'Extra latency under load.',
-      score: 'Final quality score from 0 to 100.',
-    },
-    errors: {
-      backend: 'Backend is not reachable',
-      externalLink: 'Cannot open external link',
-      screenshot: 'Screenshot failed',
-      screenshotUnavailable: 'Screenshot is available only in desktop mode',
-      screenshotCanceled: 'Screenshot saving was canceled',
-    },
-    screenshotSaved: 'Screenshot saved',
-  },
-  zh: {
-    appTitle: 'Esports Network Monitor',
-    startTest: 'Start Network Test',
-    running: 'Running',
-    idle: 'Idle',
-    finished: 'Finished',
-    quality: 'Connection Quality',
-    recommendation: 'Recommendation',
-    profile: 'Game Profile',
-    testedHost: 'Tested Host',
-    mode: 'Mode',
-    server: 'Server Pool',
-    serverAuto: 'Auto rotate',
-    nightMode: 'Night mode',
-    topLabel: 'Esports Network Monitor',
-    normalMode: 'Games',
-    socialMode: 'Social',
-    stage: 'Stage',
-    stageMap: {
-      'probing-targets': 'Finding closest route',
-      'running-samples': 'Collecting samples',
-      'computing-results': 'Computing final score',
-    },
-    lang: 'Language',
-    theme: 'Theme',
-    screenshot: 'Screenshot',
-    orange: 'Orange',
-    mono: 'Mono',
-    runHint: 'Run a test to evaluate gaming network quality.',
-    metrics: {
-      ping: 'Ping',
-      jitter: 'Jitter',
-      packetLoss: 'Packet Loss',
-      p95: 'P95 Latency',
-      spikeRate: 'Spike Rate',
-      bufferbloat: 'Bufferbloat',
-      score: 'Score',
-    },
-    units: {
-      ms: 'ms',
-      percent: '%',
-    },
-    tooltips: {
-      ping: 'Average latency. Lower is better.',
-      jitter: 'Latency variation between packets.',
-      packetLoss: 'Percentage of lost packets.',
-      p95: '95th percentile latency.',
-      spikeRate: 'Share of high-latency spikes.',
-      bufferbloat: 'Extra latency under load.',
-      score: 'Final quality score from 0 to 100.',
-    },
-    errors: {
-      backend: 'Backend is not reachable',
-      externalLink: 'Cannot open external link',
-      screenshot: 'Screenshot failed',
-      screenshotUnavailable: 'Screenshot is available only in desktop mode',
-      screenshotCanceled: 'Screenshot saving was canceled',
-    },
-    screenshotSaved: 'Screenshot saved',
-  },
+  en: enLocale,
+  ru: ruLocale,
+  zh: zhLocale,
+  cz: czLocale,
 } as const;
+
+function mapLocaleToLanguage(rawLocale: string | null | undefined): Language {
+  const locale = (rawLocale ?? '').toLowerCase();
+  if (locale.startsWith('ru')) return 'ru';
+  if (locale.startsWith('zh') || locale.startsWith('ch')) return 'zh';
+  if (locale.startsWith('cs') || locale.startsWith('cz')) return 'cz';
+  return 'en';
+}
+
+function getLocalizedText(label: Partial<Record<Language, string>> & { en: string }, language: Language): string {
+  return label[language] ?? label.en;
+}
 
 function shuffleArray<T>(input: T[]): T[] {
   const copy = [...input];
@@ -368,10 +208,7 @@ const metricOrder: Array<keyof Pick<NetworkMetrics, 'ping' | 'jitter' | 'packetL
 ];
 
 function detectLanguage(): Language {
-  const locale = navigator.language.toLowerCase();
-  if (locale.startsWith('ru')) return 'ru';
-  if (locale.startsWith('zh')) return 'zh';
-  return 'en';
+  return mapLocaleToLanguage(navigator.language);
 }
 
 function getStatusClass(status: NetworkMetrics['status'] | null): string {
@@ -384,7 +221,7 @@ function getStatusClass(status: NetworkMetrics['status'] | null): string {
 
 function App() {
   const isElectron = Boolean(window.electronAPI) || /Electron/i.test(navigator.userAgent);
-  const [language, setLanguage] = useState<Language>(detectLanguage());
+  const [language, setLanguage] = useState<Language>('en');
   const [nightMode, setNightMode] = useState(false);
   const [mode, setMode] = useState<Mode>('normal');
   const [selectedProfileId, setSelectedProfileId] = useState<string>(profiles[0].id);
@@ -416,6 +253,35 @@ function App() {
   useEffect(() => {
     document.documentElement.setAttribute('data-night', nightMode ? 'on' : 'off');
   }, [nightMode]);
+
+  useEffect(() => {
+    let canceled = false;
+
+    const applySystemLanguage = async () => {
+      const fallbackLanguage = detectLanguage();
+      if (!window.electronAPI?.getSystemLocale) {
+        setLanguage(fallbackLanguage);
+        return;
+      }
+
+      try {
+        const systemLocale = await window.electronAPI.getSystemLocale();
+        if (!canceled) {
+          setLanguage(mapLocaleToLanguage(systemLocale));
+        }
+      } catch {
+        if (!canceled) {
+          setLanguage(fallbackLanguage);
+        }
+      }
+    };
+
+    void applySystemLanguage();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const removeProgress = window.electronAPI?.onTestProgress((data) => {
@@ -540,20 +406,6 @@ function App() {
               <span className="signal-dot signal-dot-active" />
               <span className="signal-dot" />
             </div>
-            <div className="language-rail" aria-label="language-switcher">
-              {(['en', 'ru', 'zh'] as Language[]).map((lang) => (
-                <button
-                  key={lang}
-                  className={`lang-chip ${language === lang ? 'active' : ''}`}
-                  onMouseEnter={() => setLanguage(lang)}
-                  onClick={() => setLanguage(lang)}
-                  type="button"
-                >
-                  {lang.toUpperCase()}
-                  {language === lang ? <span className="lang-dot" /> : null}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="topbar-center">{t.topLabel}</div>
@@ -565,7 +417,7 @@ function App() {
                   key={link.id}
                   className="contact-chip"
                   onClick={() => openSocial(link.url)}
-                  title={link.label[language]}
+                  title={getLocalizedText(link.label, language)}
                 >
                   {link.icon}
                 </button>
@@ -684,7 +536,7 @@ function App() {
                     }}
                     className={selectedProfile.id === profile.id ? 'active' : ''}
                   >
-                    {profile.label[language]}
+                    {getLocalizedText(profile.label, language)}
                   </button>
                 ))}
               </div>
@@ -695,7 +547,7 @@ function App() {
               <div className="list-group">
                 {socialLinks.map((item) => (
                   <button key={item.id} onClick={() => openSocial(item.url)}>
-                    {item.label[language]}
+                    {getLocalizedText(item.label, language)}
                   </button>
                 ))}
               </div>

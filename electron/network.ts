@@ -1,5 +1,37 @@
 import { Socket } from 'net';
 
+const MIN_SAMPLES = 3;
+const MAX_SAMPLES = 100;
+
+function logValidationWarning(message: string, details?: Record<string, unknown>): void {
+  const payload = details ? ` ${JSON.stringify(details)}` : '';
+  console.warn(`[network-validation] ${message}${payload}`);
+}
+
+function sanitizeNumberList(values: number[]): number[] {
+  return values.filter((value) => Number.isFinite(value) && value >= 0);
+}
+
+function normalizeSampleCount(samples: number): number {
+  if (!Number.isFinite(samples)) {
+    logValidationWarning('Samples is not a finite number, fallback to minimum.', { samples });
+    return MIN_SAMPLES;
+  }
+
+  const rounded = Math.round(samples);
+  if (rounded < MIN_SAMPLES) {
+    logValidationWarning('Samples is below minimum, clamped.', { samples: rounded, min: MIN_SAMPLES });
+    return MIN_SAMPLES;
+  }
+
+  if (rounded > MAX_SAMPLES) {
+    logValidationWarning('Samples is above maximum, clamped.', { samples: rounded, max: MAX_SAMPLES });
+    return MAX_SAMPLES;
+  }
+
+  return rounded;
+}
+
 /**
  * Ping measurement result interface.
  * @property host - Host address
@@ -120,7 +152,7 @@ function calculateJitterHelper(pings: number[]): number {
  * @returns Average jitter
  */
 export function calculateJitter(pings: number[]): number {
-  return calculateJitterHelper(pings);
+  return calculateJitterHelper(sanitizeNumberList(pings));
 }
 
 /**
@@ -130,8 +162,18 @@ export function calculateJitter(pings: number[]): number {
  * @returns Loss percentage
  */
 export function calculatePacketLoss(totalRequests: number, successfulRequests: number): number {
-  if (totalRequests === 0) return 0;
-  return ((totalRequests - successfulRequests) / totalRequests) * 100;
+  if (!Number.isFinite(totalRequests) || !Number.isFinite(successfulRequests)) {
+    logValidationWarning('Packet loss input contains non-finite values.', {
+      totalRequests,
+      successfulRequests,
+    });
+    return 0;
+  }
+
+  if (totalRequests <= 0) return 0;
+
+  const boundedSuccess = Math.min(Math.max(successfulRequests, 0), totalRequests);
+  return ((totalRequests - boundedSuccess) / totalRequests) * 100;
 }
 
 /**
@@ -140,18 +182,20 @@ export function calculatePacketLoss(totalRequests: number, successfulRequests: n
  * @returns p95
  */
 export function calculateP95(pings: number[]): number {
-  if (pings.length === 0) return 0;
-  const sorted = [...pings].sort((a, b) => a - b);
+  const sanitized = sanitizeNumberList(pings);
+  if (sanitized.length === 0) return 0;
+  const sorted = [...sanitized].sort((a, b) => a - b);
   const index = Math.ceil(0.95 * sorted.length) - 1;
-  return sorted[index];
+  return sorted[Math.max(0, Math.min(index, sorted.length - 1))];
 }
 
 export function calculateSpikeRate(pings: number[]): number {
-  if (pings.length === 0) return 0;
-  const avg = pings.reduce((sum, item) => sum + item, 0) / pings.length;
+  const sanitized = sanitizeNumberList(pings);
+  if (sanitized.length === 0) return 0;
+  const avg = sanitized.reduce((sum, item) => sum + item, 0) / sanitized.length;
   const threshold = Math.max(80, avg * 1.5);
-  const spikes = pings.filter((value) => value > threshold).length;
-  return (spikes / pings.length) * 100;
+  const spikes = sanitized.filter((value) => value > threshold).length;
+  return (spikes / sanitized.length) * 100;
 }
 
 export function calculateBufferbloat(avgPing: number, p95: number): number {
@@ -160,11 +204,30 @@ export function calculateBufferbloat(avgPing: number, p95: number): number {
 
 function normalizeHosts(hostOrHosts: string | string[]): string[] {
   if (Array.isArray(hostOrHosts)) {
-    const cleaned = hostOrHosts.map((item) => item.trim()).filter(Boolean);
+    const cleaned = hostOrHosts
+      .map((item) => item.trim())
+      .filter((item, index, all) => {
+        if (!item) return false;
+        return all.indexOf(item) === index;
+      });
+
+    if (cleaned.length !== hostOrHosts.length) {
+      logValidationWarning('Host list was normalized (empty or duplicate values removed).', {
+        original: hostOrHosts.length,
+        normalized: cleaned.length,
+      });
+    }
+
     return cleaned.length > 0 ? cleaned : ['8.8.8.8'];
   }
 
-  return hostOrHosts.trim() ? [hostOrHosts.trim()] : ['8.8.8.8'];
+  const singleHost = hostOrHosts.trim();
+  if (!singleHost) {
+    logValidationWarning('Single host is empty, fallback to default host.');
+    return ['8.8.8.8'];
+  }
+
+  return [singleHost];
 }
 
 async function selectBestHost(hosts: string[]): Promise<string> {
@@ -222,7 +285,7 @@ export async function runNetworkTest(
   onProgress?: (payload: ProgressPayload) => void
 ): Promise<NetworkMetrics> {
   const hosts = normalizeHosts(hostOrHosts);
-  const safeSamples = Math.max(3, samples);
+  const safeSamples = normalizeSampleCount(samples);
 
   onProgress?.({
     stage: 'probing-targets',
@@ -246,9 +309,14 @@ export async function runNetworkTest(
   for (let i = 0; i < safeSamples; i++) {
     const result = await measureTcpPing(bestHost, 443, 2000);
     
-    if (result.success) {
+    if (result.success && Number.isFinite(result.ping) && result.ping >= 0) {
       pings.push(result.ping);
       successCount++;
+    } else if (result.success) {
+      logValidationWarning('Ping sample ignored due to invalid value.', {
+        host: bestHost,
+        ping: result.ping,
+      });
     }
     
     // Calculate intermediate metrics

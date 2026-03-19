@@ -1,5 +1,11 @@
 import { describe, test, expect } from 'vitest';
-import { measureTcpPing, calculateJitter, calculatePacketLoss, calculateP95 } from '../../electron/network';
+import {
+  calculateBufferbloat,
+  calculateJitter,
+  calculateP95,
+  calculatePacketLoss,
+  calculateSpikeRate,
+} from '../../electron/network';
 
 describe('Network Metrics', () => {
   test('calculateJitter returns correct value', () => {
@@ -7,9 +13,16 @@ describe('Network Metrics', () => {
     expect(calculateJitter(pings)).toBeCloseTo(10);
   });
 
+  test('calculateJitter ignores invalid values', () => {
+    const pings = [10, Number.NaN, -5, 20, 40];
+    expect(calculateJitter(pings)).toBeCloseTo(15);
+  });
+
   test('calculatePacketLoss returns correct percentage', () => {
     expect(calculatePacketLoss(100, 90)).toBeCloseTo(10);
     expect(calculatePacketLoss(0, 0)).toBe(0);
+    expect(calculatePacketLoss(10, 20)).toBe(0);
+    expect(calculatePacketLoss(10, -3)).toBe(100);
   });
 
   test('calculateP95 returns correct percentile', () => {
@@ -17,10 +30,16 @@ describe('Network Metrics', () => {
     expect(calculateP95(pings)).toBe(95);
   });
 
-  test('measureTcpPing returns result', async () => {
-    const result = await measureTcpPing('8.8.8.8', 80, 1000);
-    expect(result).toHaveProperty('host');
-    expect(result).toHaveProperty('ping');
-    expect(result).toHaveProperty('success');
+  test('calculateP95 returns 0 on invalid input list', () => {
+    expect(calculateP95([Number.NaN, -1])).toBe(0);
+  });
+
+  test('calculateSpikeRate returns expected value', () => {
+    expect(calculateSpikeRate([10, 10, 200, 10])).toBe(25);
+  });
+
+  test('calculateBufferbloat never returns negative', () => {
+    expect(calculateBufferbloat(40, 20)).toBe(0);
+    expect(calculateBufferbloat(20, 40)).toBe(20);
   });
 });

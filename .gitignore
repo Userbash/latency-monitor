@@ -1,7 +1,13 @@
 dist/
+dist-electron/
 node_modules/
 build/
 .venv/
+reports/
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
 *.AppImage
 *.asar
 *.exe
