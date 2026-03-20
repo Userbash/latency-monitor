@@ -1,0 +1,7 @@
+Commit annotation
+
+Purpose: Stabilize CI smoke E2E behavior for the start-test interaction.
+
+What changed: The test now mocks /api/start-test with a controlled delayed success response, then validates disabled/running state and final finished state.
+
+Language check: No Russian text was found in repository files at commit time, so no translation edits were necessary.
