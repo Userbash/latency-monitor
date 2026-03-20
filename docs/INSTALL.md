@@ -17,6 +17,9 @@ npm run test:unit
 npm run test:backend
 ```
 
+## Optional: Local GitHub Actions with act
+If you want to run CI jobs locally before pushing, see `docs/ACT.md`.
+
 ## Build Frontend and Electron Targets
 ```bash
 npm run build

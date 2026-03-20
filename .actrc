@@ -1,0 +1,5 @@
+# Use the same workflow file by default.
+-W .github/workflows/ci-cd.yml
+
+# Map GitHub runner labels to a local Docker image for act.
+-P ubuntu-latest=ghcr.io/catthehacker/ubuntu:act-latest

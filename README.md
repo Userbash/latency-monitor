@@ -2,6 +2,9 @@
 
 Esports Network Monitor is a desktop network diagnostics application built around a Rust backend API, Electron runtime, and React frontend.
 
+## Ready UI Preview
+![Esports Network Monitor UI](images/images.jpg)
+
 ## Architecture
 - `rust-backend/`: backend service (`axum` + `tokio`) with validation, host probing, and scoring logic.
 - `electron/`: desktop process, IPC bridge, and local network test flow.
@@ -38,6 +41,12 @@ Run checks:
 npm run lint
 npm run test:unit
 npm run test:backend
+```
+
+Run CI jobs locally with act:
+```bash
+npm run act:list
+npm run act:ci:local
 ```
 
 Run frontend:
@@ -104,6 +113,7 @@ npm run docker:down
 - `docs/workflow.md`: end-to-end module interaction flow.
 - `docs/functions.md`: function-level map by module.
 - `docs/testing.md`: test execution and report artifacts.
+- `docs/ACT.md`: local GitHub Actions execution with `act`.
 - `docs/CODE_READABILITY.md`: readability and commenting conventions.
 
 ## License

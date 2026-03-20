@@ -14,7 +14,8 @@ This documentation set is fully aligned with the Rust backend architecture.
 4. `docs/workflow.md` - end-to-end architecture flow.
 5. `docs/RELEASE.md` - artifact and CI release pipeline.
 6. `docs/testing.md` - tests, reports, and debugging pipeline.
-7. `docs/CODE_READABILITY.md` - code reading guide and comment conventions.
+7. `docs/ACT.md` - local GitHub Actions execution with `act`.
+8. `docs/CODE_READABILITY.md` - code reading guide and comment conventions.
 
 ## Quick Start
 ```bash
