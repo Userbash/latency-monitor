@@ -1,0 +1,1 @@
+Commit annotation:\nThis commit finalizes local CI improvements and publication prep.\nIt adds act integration docs/scripts, hardens GitHub Actions job setup order, and documents a ready-to-use UI preview in README.\nValidation note: source files contain no Russian text at commit time.
