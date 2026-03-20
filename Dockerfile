@@ -5,16 +5,20 @@ RUN npm ci
 COPY . .
 RUN npm run build:web
 
-FROM python:3.12-slim AS runtime
+FROM rust:1.86-slim AS rust-builder
 WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+COPY rust-backend/Cargo.toml ./rust-backend/Cargo.toml
+RUN mkdir -p rust-backend/src && echo "fn main() {}" > rust-backend/src/main.rs
+RUN cargo build --release --manifest-path rust-backend/Cargo.toml
+COPY rust-backend ./rust-backend
+RUN cargo build --release --manifest-path rust-backend/Cargo.toml
+
+FROM debian:bookworm-slim AS runtime
+WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-COPY python ./python
 COPY --from=web-builder /app/dist ./dist
+COPY --from=rust-builder /app/target/release/latency-monitor-backend ./latency-monitor-backend
 EXPOSE 8000
-CMD ["python", "python/server.py"]
+CMD ["./latency-monitor-backend"]

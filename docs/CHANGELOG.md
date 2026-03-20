@@ -54,7 +54,7 @@
 ### Added
 - Full CI/CD pipeline with GitHub Actions (build, test, release, coverage, lint, debug automation)
 - AppImage packaging for Linux, EXE packaging for Windows
-- Jest and Pytest integration for frontend/backend testing
+- Frontend/backend automated test integration
 - Coverage and error/warning reports
 - Automated artifact upload and changelog generation
 - Modular documentation ([docs/])

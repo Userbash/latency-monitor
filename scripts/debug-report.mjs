@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execaCommand } from 'execa';
 
 const now = new Date();
 const stamp = now.toISOString().replace(/[:.]/g, '-');
@@ -31,43 +31,66 @@ function parseFailureHints(logText) {
     .slice(-80);
 }
 
+function parseWarningHints(logText) {
+  return logText
+    .split('\n')
+    .filter((line) => /warning|deprecated/i.test(line))
+    .slice(-80);
+}
+
+function countMatches(logText, pattern) {
+  const matches = logText.match(pattern);
+  return matches ? matches.length : 0;
+}
+
+function countErrorLikeLines(logText) {
+  return logText
+    .split('\n')
+    .filter((line) => /error|failed|exception|fatal/i.test(line))
+    .filter((line) => !/\b0\s+failed\b/i.test(line))
+    .length;
+}
+
 function tailLines(logText, maxLines = 140) {
   const lines = logText.split('\n');
   return lines.slice(Math.max(0, lines.length - maxLines));
 }
 
-function run(commandToRun, options = {}) {
+async function run(commandToRun, options = {}) {
   const { streamOutput = true } = options;
-  return new Promise((resolve) => {
-    const start = Date.now();
-    let output = '';
+  const start = Date.now();
 
-    const proc = spawn(commandToRun, {
+  try {
+    const result = await execaCommand(commandToRun, {
       cwd: root,
       shell: true,
       env: process.env,
+      all: true,
+      reject: false,
     });
 
-    proc.stdout.on('data', (chunk) => {
-      const text = chunk.toString();
-      output += text;
-      if (streamOutput) {
-        process.stdout.write(text);
-      }
-    });
+    const output = result.all ?? '';
+    if (streamOutput) {
+      process.stdout.write(output);
+    }
 
-    proc.stderr.on('data', (chunk) => {
-      const text = chunk.toString();
-      output += text;
-      if (streamOutput) {
-        process.stderr.write(text);
-      }
-    });
+    return {
+      code: result.exitCode ?? 1,
+      elapsedMs: Date.now() - start,
+      output,
+    };
+  } catch (error) {
+    const output = String(error);
+    if (streamOutput) {
+      process.stderr.write(output);
+    }
 
-    proc.on('close', (code) => {
-      resolve({ code: code ?? 1, elapsedMs: Date.now() - start, output });
-    });
-  });
+    return {
+      code: 1,
+      elapsedMs: Date.now() - start,
+      output,
+    };
+  }
 }
 
 async function collectArtifacts() {
@@ -77,11 +100,6 @@ async function collectArtifacts() {
     { id: 'npm-ls', command: 'npm ls --depth=0 --json' },
     { id: 'npm-outdated', command: 'npm outdated --json' },
   ];
-
-  const venvPython = path.join(root, '.venv', 'bin', 'python');
-  if (fs.existsSync(venvPython)) {
-    inventoryCommands.push({ id: 'python-freeze', command: `${venvPython} -m pip freeze` });
-  }
 
   for (const item of inventoryCommands) {
     const result = await run(item.command, { streamOutput: false });
@@ -115,7 +133,10 @@ for (const step of defaultSteps) {
     exitCode: result.code,
     elapsedMs: result.elapsedMs,
     logPath: path.relative(root, logPath),
+    warningCount: countMatches(result.output, /warning|deprecated/gi),
+    errorCount: countErrorLikeLines(result.output),
     logTail: tailLines(result.output),
+    warningHints: parseWarningHints(result.output),
     failureHints: result.code === 0 ? [] : parseFailureHints(result.output),
   });
 
@@ -160,6 +181,12 @@ const summaryMdLines = [
   '| Step | Status | Exit | Duration (ms) | Log |',
   '| --- | --- | ---: | ---: | --- |',
   ...summary.steps.map((step) => `| ${step.id} | ${step.status} | ${step.exitCode} | ${step.elapsedMs} | \`${step.logPath}\` |`),
+  '',
+  '## Step Warning/Error Counters',
+  '',
+  '| Step | Warnings | Error-like lines |',
+  '| --- | ---: | ---: |',
+  ...summary.steps.map((step) => `| ${step.id} | ${step.warningCount} | ${step.errorCount} |`),
   '',
   '## Library and Environment Checks',
   '',

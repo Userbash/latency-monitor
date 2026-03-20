@@ -2,6 +2,19 @@ import { Socket } from 'net';
 
 const MIN_SAMPLES = 3;
 const MAX_SAMPLES = 100;
+const DEFAULT_HOST = '8.8.8.8';
+const PROBE_PORTS = [53, 443] as const;
+const SAMPLE_TIMEOUT_MS = 2000;
+const SAMPLE_DELAY_MS = 100;
+
+function roundTo1(value: number): number {
+  return Number(value.toFixed(1));
+}
+
+function average(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
 
 function logValidationWarning(message: string, details?: Record<string, unknown>): void {
   const payload = details ? ` ${JSON.stringify(details)}` : '';
@@ -218,13 +231,13 @@ function normalizeHosts(hostOrHosts: string | string[]): string[] {
       });
     }
 
-    return cleaned.length > 0 ? cleaned : ['8.8.8.8'];
+    return cleaned.length > 0 ? cleaned : [DEFAULT_HOST];
   }
 
   const singleHost = hostOrHosts.trim();
   if (!singleHost) {
     logValidationWarning('Single host is empty, fallback to default host.');
-    return ['8.8.8.8'];
+    return [DEFAULT_HOST];
   }
 
   return [singleHost];
@@ -235,17 +248,14 @@ async function selectBestHost(hosts: string[]): Promise<string> {
   let bestLatency = Number.POSITIVE_INFINITY;
 
   for (const host of hosts) {
-    const probes = await Promise.all([
-      measureTcpPing(host, 53, 2000),
-      measureTcpPing(host, 443, 2000),
-    ]);
+    const probes = await Promise.all(PROBE_PORTS.map((port) => measureTcpPing(host, port, SAMPLE_TIMEOUT_MS)));
 
     const successful = probes.filter((item) => item.success).map((item) => item.ping);
     if (successful.length === 0) {
       continue;
     }
 
-    const avg = successful.reduce((sum, value) => sum + value, 0) / successful.length;
+    const avg = average(successful);
     if (avg < bestLatency) {
       bestLatency = avg;
       bestHost = host;
@@ -280,10 +290,11 @@ function buildRecommendation(metrics: Omit<NetworkMetrics, 'recommendation'>): s
  * In a real scenario, this would ping multiple targets multiple times.
  */
 export async function runNetworkTest(
-  hostOrHosts: string | string[] = '8.8.8.8',
+  hostOrHosts: string | string[] = DEFAULT_HOST,
   samples = 10,
   onProgress?: (payload: ProgressPayload) => void
 ): Promise<NetworkMetrics> {
+  // Normalize early so the rest of the flow can assume non-empty host list and valid sample bounds.
   const hosts = normalizeHosts(hostOrHosts);
   const safeSamples = normalizeSampleCount(samples);
 
@@ -305,12 +316,18 @@ export async function runNetworkTest(
 
   const pings: number[] = [];
   let successCount = 0;
+  let pingTotal = 0;
+  let jitterDeltaSum = 0;
 
   for (let i = 0; i < safeSamples; i++) {
-    const result = await measureTcpPing(bestHost, 443, 2000);
+    const result = await measureTcpPing(bestHost, 443, SAMPLE_TIMEOUT_MS);
     
     if (result.success && Number.isFinite(result.ping) && result.ping >= 0) {
+      if (pings.length > 0) {
+        jitterDeltaSum += Math.abs(result.ping - pings[pings.length - 1]);
+      }
       pings.push(result.ping);
+      pingTotal += result.ping;
       successCount++;
     } else if (result.success) {
       logValidationWarning('Ping sample ignored due to invalid value.', {
@@ -319,38 +336,34 @@ export async function runNetworkTest(
       });
     }
     
-    // Calculate intermediate metrics
-    const currentAvgPing = pings.length > 0 ? pings.reduce((a, b) => a + b, 0) / pings.length : 0;
-    const currentJitter = calculateJitter(pings);
+    // Keep progress updates lightweight: maintain running aggregates instead of repeated full-array scans.
+    const currentAvgPing = pings.length > 0 ? pingTotal / pings.length : 0;
+    const currentJitter = pings.length > 1 ? jitterDeltaSum / (pings.length - 1) : 0;
     const currentPacketLoss = calculatePacketLoss(i + 1, successCount);
     
     onProgress?.({
       stage: 'running-samples',
       progress: 10 + (((i + 1) / safeSamples) * 80),
       currentMetrics: {
-        ping: currentAvgPing,
-        jitter: currentJitter,
-        packetLoss: currentPacketLoss,
+        ping: roundTo1(currentAvgPing),
+        jitter: roundTo1(currentJitter),
+        packetLoss: roundTo1(currentPacketLoss),
       },
       host: bestHost,
     });
     
     // Small delay between pings
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, SAMPLE_DELAY_MS));
   }
 
-  const avgPing = pings.length > 0 ? pings.reduce((a, b) => a + b, 0) / pings.length : 0;
+  const avgPing = pings.length > 0 ? pingTotal / pings.length : 0;
   const jitter = calculateJitter(pings);
   const packetLoss = calculatePacketLoss(safeSamples, successCount);
   const p95 = calculateP95(pings);
   const spikeRate = calculateSpikeRate(pings);
   const bufferbloat = calculateBufferbloat(avgPing, p95);
   
-  // Calculate Score (Simple Algorithm)
-  // Max score 100.
-  // Ping: -1 per ms over 20ms
-  // Jitter: -2 per ms
-  // Loss: -20 per 1%
+  // Weighted penalties are tuned to make packet loss and jitter impact score more than raw latency.
   let score = 100;
   if (avgPing > 20) score -= (avgPing - 20) * 0.5;
   score -= jitter * 2;
@@ -361,7 +374,7 @@ export async function runNetworkTest(
   if (score < 0) score = 0;
   if (score > 100) score = 100;
 
-  // Determine Status based on Score
+  // Human-readable status bands for UI labels.
   let status: NetworkMetrics['status'] = 'Excellent';
   if (score < 90) status = 'Good';
   if (score < 70) status = 'Fair';
@@ -369,12 +382,12 @@ export async function runNetworkTest(
 
   const baseMetrics: Omit<NetworkMetrics, 'recommendation'> = {
     testedHost: bestHost,
-    ping: parseFloat(avgPing.toFixed(1)),
-    jitter: parseFloat(jitter.toFixed(1)),
-    packetLoss: parseFloat(packetLoss.toFixed(1)),
-    p95: parseFloat(p95.toFixed(1)),
-    spikeRate: parseFloat(spikeRate.toFixed(1)),
-    bufferbloat: parseFloat(bufferbloat.toFixed(1)),
+    ping: roundTo1(avgPing),
+    jitter: roundTo1(jitter),
+    packetLoss: roundTo1(packetLoss),
+    p95: roundTo1(p95),
+    spikeRate: roundTo1(spikeRate),
+    bufferbloat: roundTo1(bufferbloat),
     status,
     score: Math.round(score)
   };

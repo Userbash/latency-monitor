@@ -1,74 +1,40 @@
-# Installation and Setup Guide
+# Installation Guide
 
-## Supported Platforms
-- Windows 10/11 (x64)
-- Linux (Ubuntu 22.04+, Fedora, Arch, Alpine)
-- macOS (experimental, Electron only)
+## Requirements
+- Node.js 20+
+- Rust toolchain (stable)
+- Docker (optional)
 
-## Prerequisites
-- Node.js (v20+ recommended)
-- Python (3.12+ recommended)
-- Docker (optional, for containerized builds)
+## Install Project Dependencies
+```bash
+npm install
+```
 
-## Dependencies
-### JavaScript/TypeScript
-- Install with `npm install` (uses package.json)
-- Key libraries: Electron, React, Vite, TypeScript, TailwindCSS, concurrently, wait-on
+## Verify Local Tooling
+```bash
+npm run lint
+npm run test:unit
+npm run test:backend
+```
 
-### Python
-- Install with `pip install -r requirements.txt`
-- Key libraries: fastapi, uvicorn, pydantic, icmplib, dnspython, qasync
+## Build Frontend and Electron Targets
+```bash
+npm run build
+```
 
-## Build Instructions
-### Electron + React Frontend
-1. Install Node dependencies:
-   ```bash
-   npm install
-   ```
-2. Build frontend:
-   ```bash
-   npm run build:web
-   ```
-3. Build Electron app:
-   ```bash
-   npm run build
-   ```
-4. Package for distribution:
-   ```bash
-   npm run dist
-   ```
+## Run Rust Backend Locally
+```bash
+npm run dev:backend
+```
 
-### Python Backend (FastAPI + Qt)
-1. Install Python dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-2. Run backend server:
-   ```bash
-   python python/server.py
-   ```
-3. (Optional) Run Qt wrapper:
-   ```bash
-   python python/main.py
-   ```
+Optional environment variables:
+- `HOST` (default: `127.0.0.1`)
+- `PORT` (default: `8000`)
+- `DIST_PATH` (default: `dist`)
 
-### Docker Build
-1. Build and run with Docker:
-   ```bash
-   docker build -t esports-network-monitor .
-   docker run -p 8000:8000 esports-network-monitor
-   ```
-
-## Usage
-- Launch Electron app for desktop experience
-- Use Python Qt wrapper for native Linux integration
-- Access FastAPI backend at `http://localhost:8000`
-
-## Troubleshooting
-- Ensure Node.js and Python versions match requirements
-- For Linux Qt, verify Wayland/xcb support and install required system packages
-- For Docker, use compatible base images and expose port 8000
-
----
-
-For advanced configuration, see [electron.md](electron.md), [python.md](python.md), and [frontend.md](frontend.md).
+## Docker Runtime
+```bash
+npm run docker:build
+npm run docker:up
+npm run docker:down
+```

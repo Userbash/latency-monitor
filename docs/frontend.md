@@ -17,8 +17,9 @@ The frontend provides a user interface for network testing, profile selection, a
 ## Workflow
 1. User selects profile or server.
 2. Starts network test from UI.
-3. Receives progress and results via IPC.
-4. Results shown with recommendations.
+3. Receives progress and results via IPC (desktop) or Rust API fallback (web mode).
+4. Applies runtime payload guards before rendering metrics.
+5. Results shown with recommendations.
 
 ---
 

@@ -12,5 +12,6 @@ test('app launches and core controls are interactive', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'CS2' })).toBeVisible();
 
   await page.getByTestId('start-test-btn').click();
-  await expect(page.getByText('Running')).toBeVisible();
+  await expect(page.getByTestId('start-test-btn')).toBeDisabled();
+  await expect(page.locator('.status-row span').first()).toHaveText('Running');
 });

@@ -13,3 +13,5 @@ playwright-report/
 *.exe
 *.dmg
 *.log
+rust-backend/target/
+.cargo-home/

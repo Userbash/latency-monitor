@@ -1,37 +1,31 @@
 # Function Reference
 
 ## Electron
-### main.ts
-- `configureStoragePaths()`: Sets up storage directories for app data.
-- `isAllowedExternalUrl(rawUrl)`: Checks if a URL is safe for external opening.
-- `createWindow()`: Initializes main window, sets web preferences.
-- IPC handlers:
-  - `window-controls`: Minimize, maximize, close window.
-  - `start-network-test`: Runs network test, sends progress/results.
-  - `open-external`: Opens external URLs securely.
-  - `capture-screenshot`: Captures window screenshot.
+### `electron/main.ts`
+- window creation and lifecycle
+- IPC handlers for test start/progress/results
+- secure external URL opening
+- payload sanitization for hosts/samples
 
-### network.ts
-- `measureTcpPing(host, port, timeout)`: TCP ping measurement.
-- `calculateJitter(pings)`: Jitter calculation.
-- `calculatePacketLoss(total, success)`: Packet loss calculation.
-- `calculateP95(pings)`: 95th percentile latency.
+### `electron/network.ts`
+- TCP ping sampling
+- jitter / packet-loss / p95 / spike-rate calculations
+- aggregated network quality result builder
+- defensive input normalization and bounded scoring
 
-## Python
-### main.py
-- `configure_qt_for_linux()`: Linux Qt environment setup.
-- `MainWindow`: Qt main window class.
-
-### server.py
-- `resolve_dist_path()`: Static files path resolution.
-- `NetworkProfile`: Pydantic model for test profiles.
-- FastAPI endpoints: Network test, DNS resolution.
+## Rust backend
+### `rust-backend/src/main.rs`
+- `GET /api/status`
+- `POST /api/start-test`
+- strict request shape validation (`serde`)
+- host/target normalization and sample clamping
+- candidate pool construction and DNS/IP filtering
+- three-pass host verification and metric aggregation
+- score classification and recommendation generation
 
 ## Frontend
-### App.tsx
-- Profile management, state, UI rendering.
-- Receives test progress/results via IPC.
-
----
-
-See module docs for workflow and integration details.
+### `src/App.tsx`
+- profile/server selection
+- API/IPC test start flow
+- progress rendering and metrics display
+- runtime payload guards for progress/API responses

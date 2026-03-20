@@ -4,6 +4,11 @@ export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
   retries: 0,
+  reporter: [
+    ['list'],
+    ['html', { outputFolder: 'reports/playwright-html', open: 'never' }],
+    ['json', { outputFile: 'reports/playwright-results.json' }],
+  ],
   use: {
     baseURL: 'http://127.0.0.1:4173',
     trace: 'on-first-retry',

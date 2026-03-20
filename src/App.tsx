@@ -46,6 +46,9 @@ type ProgressPayload = {
   };
 };
 
+const TEST_SAMPLE_COUNT = 12;
+const TARGET_POOL_LIMIT = 8;
+
 const profiles: Profile[] = [
   {
     id: 'cs2',
@@ -197,6 +200,54 @@ function shuffleArray<T>(input: T[]): T[] {
   return copy;
 }
 
+function buildRotatedTargets(
+  selectedServer: ServerSelection,
+  availableServers: string[],
+  lastTestedHost: string | null
+): string[] {
+  const baseTargets = selectedServer === 'auto'
+    ? availableServers
+    : [selectedServer, ...availableServers.filter((item) => item !== selectedServer)];
+
+  const withoutPrevious = lastTestedHost && baseTargets.length > 1
+    ? baseTargets.filter((item) => item !== lastTestedHost)
+    : baseTargets;
+
+  const source = withoutPrevious.length > 0 ? withoutPrevious : baseTargets;
+  return shuffleArray(source).slice(0, TARGET_POOL_LIMIT);
+}
+
+function clampProgress(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function sanitizeProgressPayload(data: ProgressPayload): ProgressPayload {
+  const host = data.host.trim();
+  return {
+    ...data,
+    progress: clampProgress(data.progress),
+    host: host || 'unknown-host',
+    currentMetrics: {
+      ping: Number.isFinite(data.currentMetrics.ping) ? data.currentMetrics.ping : 0,
+      jitter: Number.isFinite(data.currentMetrics.jitter) ? data.currentMetrics.jitter : 0,
+      packetLoss: Number.isFinite(data.currentMetrics.packetLoss) ? data.currentMetrics.packetLoss : 0,
+    },
+  };
+}
+
+function ensureSelectedServer(selectedServer: ServerSelection, availableServers: string[]): ServerSelection {
+  if (selectedServer === 'auto') return 'auto';
+  // Fallback to auto when profile switch removes the previously selected host.
+  return availableServers.includes(selectedServer) ? selectedServer : 'auto';
+}
+
+function isNetworkMetricsPayload(input: unknown): input is { results: NetworkMetrics } {
+  if (!input || typeof input !== 'object') return false;
+  const payload = input as { results?: Partial<NetworkMetrics> };
+  return Boolean(payload.results && typeof payload.results.testedHost === 'string');
+}
+
 const metricOrder: Array<keyof Pick<NetworkMetrics, 'ping' | 'jitter' | 'packetLoss' | 'p95' | 'spikeRate' | 'bufferbloat' | 'score'>> = [
   'ping',
   'jitter',
@@ -234,6 +285,7 @@ function App() {
   const [errorText, setErrorText] = useState<string>('');
   const [infoText, setInfoText] = useState<string>('');
   const [lastTestedHost, setLastTestedHost] = useState<string | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
 
   const t = useMemo(() => i18n[language], [language]);
   const selectedProfile = useMemo(
@@ -245,6 +297,11 @@ function App() {
     () => Array.from(new Set([...selectedProfile.targets, ...globalServerPool])),
     [selectedProfile.targets]
   );
+
+  useEffect(() => {
+    // Keep selected server valid when profile/server pools change.
+    setSelectedServer((prev) => ensureSelectedServer(prev, availableServers));
+  }, [availableServers]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', 'orange');
@@ -285,18 +342,19 @@ function App() {
 
   useEffect(() => {
     const removeProgress = window.electronAPI?.onTestProgress((data) => {
+      const safeData = sanitizeProgressPayload(data);
       setStatusText(t.running);
-      setProgress(Math.round(data.progress));
-      setProgressStage(data.stage);
-      setLastTestedHost(data.host);
+      setProgress(safeData.progress);
+      setProgressStage(safeData.stage);
+      setLastTestedHost(safeData.host);
       setMetrics((prev) => {
         if (!prev) return null;
         return {
           ...prev,
-          ping: Number(data.currentMetrics.ping.toFixed(1)),
-          jitter: Number(data.currentMetrics.jitter.toFixed(1)),
-          packetLoss: Number(data.currentMetrics.packetLoss.toFixed(1)),
-          testedHost: data.host,
+          ping: Number(safeData.currentMetrics.ping.toFixed(1)),
+          jitter: Number(safeData.currentMetrics.jitter.toFixed(1)),
+          packetLoss: Number(safeData.currentMetrics.packetLoss.toFixed(1)),
+          testedHost: safeData.host,
         };
       });
     });
@@ -306,11 +364,13 @@ function App() {
       setProgress(100);
       setMetrics(results);
       setLastTestedHost(results.testedHost);
+      setIsRunning(false);
     });
 
     const removeError = window.electronAPI?.onTestError((message) => {
       setErrorText(message);
       setStatusText('Error');
+      setIsRunning(false);
     });
 
     return () => {
@@ -321,44 +381,55 @@ function App() {
   }, [t.finished, t.running]);
 
   const startTest = async () => {
+    if (isRunning) {
+      return;
+    }
+
     setErrorText('');
     setInfoText('');
     setStatusText(t.running);
     setProgress(0);
     setMetrics(null);
+    setIsRunning(true);
 
-    const baseTargets = selectedServer === 'auto'
-      ? availableServers
-      : [selectedServer, ...availableServers.filter((item) => item !== selectedServer)];
-
-    const withoutPrevious = lastTestedHost && baseTargets.length > 1
-      ? baseTargets.filter((item) => item !== lastTestedHost)
-      : baseTargets;
-
-    const rotatedTargets = shuffleArray(withoutPrevious.length > 0 ? withoutPrevious : baseTargets).slice(0, 8);
+    const rotatedTargets = buildRotatedTargets(selectedServer, availableServers, lastTestedHost);
 
     if (window.electronAPI) {
-      window.electronAPI.startNetworkTest({ targets: rotatedTargets, samples: 12 });
+      // Desktop mode uses IPC to stream progress updates from Electron main process.
+      window.electronAPI.startNetworkTest({ targets: rotatedTargets, samples: TEST_SAMPLE_COUNT });
       return;
     }
 
     try {
+      // Browser/API mode performs a single request and receives final aggregated metrics.
       const response = await fetch('/api/start-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           host: rotatedTargets[0] || availableServers[0],
           targets: rotatedTargets,
-          samples: 12,
+          samples: TEST_SAMPLE_COUNT,
         }),
       });
 
-      const data = await response.json();
-      setMetrics(data.results as NetworkMetrics);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data: unknown = await response.json();
+      if (!isNetworkMetricsPayload(data)) {
+        throw new Error('Unexpected API response payload.');
+      }
+
+      setMetrics(data.results);
       setProgress(100);
       setStatusText(t.finished);
+      setLastTestedHost(data.results.testedHost);
     } catch {
       setErrorText(t.errors.backend);
+      setStatusText('Error');
+    } finally {
+      setIsRunning(false);
     }
   };
 
@@ -469,8 +540,8 @@ function App() {
           </div>
 
           <div className="action-row">
-            <button data-testid="start-test-btn" onClick={startTest} className="start-btn no-drag">
-              {t.startTest}
+            <button data-testid="start-test-btn" onClick={startTest} className="start-btn no-drag" disabled={isRunning}>
+              {isRunning ? t.running : t.startTest}
             </button>
           </div>
 

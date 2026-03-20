@@ -30,6 +30,7 @@ describe('App interactions', () => {
 
   test('starts network test in web mode and renders metrics', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
       json: async () => ({ results: mockMetrics }),
     } as Response);
 

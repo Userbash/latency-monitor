@@ -10,11 +10,22 @@
 - Artifacts are generated for Windows (EXE), Linux (AppImage), and optionally macOS (DMG).
 - See `electron-builder.yml` for configuration.
 
-### Python Backend
+### Rust Backend
 - Package backend with Docker:
   ```bash
   docker build -t esports-network-monitor .
   ```
+
+### CI-Oriented Release Commands
+- Linux AppImage:
+  ```bash
+  npm run release:ci:appimage
+  ```
+- Windows NSIS + portable:
+  ```bash
+  npm run release:ci:win
+  ```
+
 - Release scripts:
   - Linux: `scripts/release-appimage.sh`
   - Windows: `scripts/release-windows.sh`, `scripts/release-windows.ps1`

@@ -1,7 +1,7 @@
 # Electron Module
 
 ## Purpose
-The Electron module is responsible for the main desktop application logic, window management, IPC communication, and integration with the network testing backend.
+The Electron module is responsible for desktop runtime orchestration, window management, IPC communication, and integration with the Rust backend/API flow.
 
 ### Main Files
 - `main.ts`: Entry point, window creation, IPC handlers, security.
@@ -25,7 +25,8 @@ The Electron module is responsible for the main desktop application logic, windo
 1. Electron app starts, creates window.
 2. User triggers network test via UI.
 3. IPC sends test request to main process.
-4. Main process runs test, returns results.
+4. Main process validates/sanitizes payload.
+5. Main process runs local network engine or delegates to Rust API path.
 5. Results displayed in UI.
 
 ---

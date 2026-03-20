@@ -4,9 +4,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+source "$(dirname "$0")/release-common.sh"
+
 echo "[1/3] Running validation"
-npm run test:unit
-npm run test:backend
+validate_release_inputs
 
 echo "[2/3] Building AppImage with report"
 npm run build:report:appimage

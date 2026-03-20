@@ -8,155 +8,144 @@ on:
   workflow_dispatch:
 
 jobs:
-  unit-tests:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.12
-      - name: Install Node dependencies
-        run: npm install
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt
-      - name: Run frontend unit tests (Jest)
-        run: npm run test:unit
-      - name: Run backend unit tests (Pytest)
-        run: pytest python/
-      - name: Generate coverage reports
-        run: npm run test -- --coverage
-      - name: Pytest coverage report
-        run: pytest --cov=python --cov-report=xml
-      - name: Upload coverage reports
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-reports
-          path: |
-            coverage/
-            coverage.xml
+          cache: npm
 
-  lint-debug:
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Validate workflow files
+        run: npm run workflow:check
+
+      - name: Install Playwright browser
+        run: npm run test:e2e:install
+
+      - name: Run prebuild quality gates
+        run: npm run test:prebuild
+
+      - name: Run E2E tests
+        run: npm run test:e2e:ci
+
+      - name: Run postbuild checks
+        run: npm run build && npm run test:postbuild
+
+      - name: Collect debug report on failure
+        if: failure()
+        run: npm run debug:report:ci || true
+
+      - name: Upload debug report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-debug-report
+          path: reports/debug/**
+          if-no-files-found: ignore
+
+  rust-backend-tests:
     runs-on: ubuntu-latest
-    needs: unit-tests
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust-backend
+
+      - name: Run Rust backend tests
+        run: npm run test:backend
+
+      - name: Collect debug report on failure
+        if: failure()
+        run: npm run debug:report:ci || true
+
+      - name: Upload debug report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-backend-debug-report
+          path: reports/debug/**
+          if-no-files-found: ignore
+
+  release-builds:
+    name: release-${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    needs: [quality, rust-backend-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: appimage
+            command: npm run release:ci:appimage
+            artifactName: appimage-artifacts
+            artifactPath: dist/*.AppImage
+          - os: windows-latest
+            target: windows
+            command: npm run release:ci:win
+            artifactName: windows-artifacts
+            artifactPath: dist/*.exe
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
       - name: Install Node dependencies
-        run: npm install
-      - name: Code quality and lint (ESLint)
-        run: npm run lint
-      - name: Debug and error log collection
-        run: |
-          grep -i 'error\|warning' dist-electron/main.js || true
-          grep -i 'error\|warning' dist-electron/network.js || true
+        run: npm ci
 
-  build-release-linux:
-      runs-on: ubuntu-latest
-      needs: [unit-tests, lint-debug]
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
-        - name: Set up Node.js
-          uses: actions/setup-node@v3
-          with:
-            node-version: 20
-        - name: Set up Python
-          uses: actions/setup-python@v4
-          with:
-            python-version: 3.12
-        - name: Install Node dependencies
-          run: npm install
-        - name: Install Python dependencies
-          run: pip install -r requirements.txt
-        - name: Build frontend
-          run: npm run build:web
-        - name: Build Electron app
-          run: npm run build
-        - name: Build Docker image
-          run: docker build -t esports-network-monitor .
-        - name: Package AppImage (Linux)
-          run: |
-            chmod +x scripts/release-appimage.sh
-            ./scripts/release-appimage.sh
-        - name: Upload Linux artifacts
-          uses: actions/upload-artifact@v3
-          with:
-            name: linux-artifacts
-            path: |
-              dist-electron/*.AppImage
-        - name: Publish GitHub Release (Linux)
-          uses: softprops/action-gh-release@v1
-          with:
-            files: dist-electron/*.AppImage
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        - name: Generate changelog
-          run: npx changelogithub
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        - name: Notify on failure
-          if: failure()
-          uses: actions/github-script@v6
-          with:
-            script: |
-              github.issues.createComment({
-                issue_number: context.issue.number,
-                body: 'Linux build/release failed. Please check logs and coverage reports.'
-              })
+      - name: Build release artifacts
+        run: ${{ matrix.command }}
 
-  build-release-windows:
-      runs-on: windows-latest
-      needs: [unit-tests, lint-debug]
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v3
-        - name: Set up Node.js
-          uses: actions/setup-node@v3
-          with:
-            node-version: 20
-        - name: Set up Python
-          uses: actions/setup-python@v4
-          with:
-            python-version: 3.12
-        - name: Install Node dependencies
-          run: npm install
-        - name: Install Python dependencies
-          run: pip install -r requirements.txt
-        - name: Build frontend
-          run: npm run build:web
-        - name: Build Electron app
-          run: npm run build
-        - name: Package Windows EXE
-          run: |
-            powershell scripts/release-windows.ps1
-        - name: Upload Windows artifacts
-          uses: actions/upload-artifact@v3
-          with:
-            name: windows-artifacts
-            path: |
-              dist-electron/*.exe
-        - name: Publish GitHub Release (Windows)
-          uses: softprops/action-gh-release@v1
-          with:
-            files: dist-electron/*.exe
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        - name: Generate changelog
-          run: npx changelogithub
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        - name: Notify on failure
-          if: failure()
-          uses: actions/github-script@v6
-          with:
-            script: |
-              github.issues.createComment({
-                issue_number: context.issue.number,
-                body: 'Windows build/release failed. Please check logs and coverage reports.'
-              })
+      - name: Run AppImage postbuild checks
+        if: matrix.target == 'appimage'
+        run: npm run test:postbuild:appimage
+
+      - name: Run Windows postbuild checks
+        if: matrix.target == 'windows'
+        run: npm run test:postbuild:win
+
+      - name: Collect debug report on failure
+        if: failure()
+        run: npm run debug:report:ci || true
+
+      - name: Upload release artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactName }}
+          path: ${{ matrix.artifactPath }}
+          if-no-files-found: error
+
+      - name: Upload debug report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}-debug-report
+          path: reports/debug/**
+          if-no-files-found: ignore
+
+      - name: Upload postbuild report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.target }}-postbuild-report
+          path: reports/postbuild/**
+          if-no-files-found: ignore

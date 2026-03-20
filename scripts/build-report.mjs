@@ -1,7 +1,7 @@
-import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execaCommand } from 'execa';
 
 const now = new Date();
 const stamp = now.toISOString().replace(/[:.]/g, '-');
@@ -22,39 +22,60 @@ function parseFailureHints(logText) {
     .slice(-40);
 }
 
+function parseWarningHints(logText) {
+  return logText
+    .split('\n')
+    .filter((line) => /warning|deprecated/i.test(line))
+    .slice(-80);
+}
+
+function countMatches(logText, pattern) {
+  const matches = logText.match(pattern);
+  return matches ? matches.length : 0;
+}
+
+function countErrorLikeLines(logText) {
+  return logText
+    .split('\n')
+    .filter((line) => /error|failed|exception|fatal/i.test(line))
+    .filter((line) => !/\b0\s+failed\b/i.test(line))
+    .length;
+}
+
 function tailLines(logText, maxLines = 120) {
   const lines = logText.split('\n');
   return lines.slice(Math.max(0, lines.length - maxLines));
 }
 
-function run(commandToRun) {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    let output = '';
+async function run(commandToRun) {
+  const start = Date.now();
 
-    const proc = spawn(commandToRun, {
+  try {
+    const result = await execaCommand(commandToRun, {
       cwd: root,
       shell: true,
       env: process.env,
+      all: true,
+      reject: false,
     });
 
-    proc.stdout.on('data', (chunk) => {
-      const text = chunk.toString();
-      output += text;
-      process.stdout.write(text);
-    });
+    const output = result.all ?? '';
+    process.stdout.write(output);
 
-    proc.stderr.on('data', (chunk) => {
-      const text = chunk.toString();
-      output += text;
-      process.stderr.write(text);
-    });
-
-    proc.on('close', (code) => {
-      const elapsedMs = Date.now() - start;
-      resolve({ code: code ?? 1, elapsedMs, output });
-    });
-  });
+    return {
+      code: result.exitCode ?? 1,
+      elapsedMs: Date.now() - start,
+      output,
+    };
+  } catch (error) {
+    const output = String(error);
+    process.stderr.write(output);
+    return {
+      code: 1,
+      elapsedMs: Date.now() - start,
+      output,
+    };
+  }
 }
 
 const result = await run(command);
@@ -73,8 +94,11 @@ const summary = {
   platform: process.platform,
   arch: process.arch,
   hostname: os.hostname(),
+  warningCount: countMatches(result.output, /warning|deprecated/gi),
+  errorCount: countErrorLikeLines(result.output),
   logPath: path.relative(root, rawLogPath),
   logTail: tailLines(result.output),
+  warningHints: parseWarningHints(result.output),
   failureHints: result.code === 0 ? [] : parseFailureHints(result.output),
 };
 
@@ -93,7 +117,13 @@ const summaryMd = [
   `- Node: ${summary.nodeVersion}`,
   `- Platform: ${summary.platform}/${summary.arch}`,
   `- Host: ${summary.hostname}`,
+  `- Warning count: ${summary.warningCount}`,
+  `- Error-like count: ${summary.errorCount}`,
   `- Raw log: \`${summary.logPath}\``,
+  '',
+  '## Warning Hints',
+  '',
+  summary.warningHints.length > 0 ? summary.warningHints.map((line) => `- ${line}`).join('\n') : '- No warning hints detected.',
   '',
   '## Failure Hints',
   '',

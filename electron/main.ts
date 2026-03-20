@@ -9,6 +9,48 @@ const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const APP_DATA_DIR = 'EsportsNetworkMonitor';
+const DEFAULT_TARGET = '8.8.8.8';
+const DEFAULT_SAMPLES = 12;
+const MIN_SAMPLES = 3;
+const MAX_SAMPLES = 100;
+
+type StartNetworkTestPayload = {
+  host?: string;
+  targets?: string[];
+  samples?: number;
+};
+
+type WindowCommand = 'minimize' | 'maximize' | 'close';
+
+function isWindowCommand(command: unknown): command is WindowCommand {
+  return command === 'minimize' || command === 'maximize' || command === 'close';
+}
+
+function sanitizeStartTestPayload(payload: StartNetworkTestPayload | undefined): {
+  targets: string[];
+  samples: number;
+} {
+  // IPC payload is untrusted input from renderer; normalize and bound it before use.
+  const rawTargets = Array.isArray(payload?.targets) ? payload.targets : [payload?.host || DEFAULT_TARGET];
+  const targets = Array.from(
+    new Set(
+      rawTargets
+        .map((item) => String(item ?? '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  const sampleCandidate = Number(payload?.samples);
+  const safeSamples = Number.isFinite(sampleCandidate)
+    ? Math.max(MIN_SAMPLES, Math.min(MAX_SAMPLES, Math.round(sampleCandidate)))
+    : DEFAULT_SAMPLES;
+
+  return {
+    // Always return at least one target so the worker never runs with an empty host set.
+    targets: targets.length > 0 ? targets : [DEFAULT_TARGET],
+    samples: safeSamples,
+  };
+}
 
 function configureStoragePaths(): void {
   const appDataBase = app.getPath('appData');
@@ -34,6 +76,7 @@ if (require('electron-squirrel-startup')) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let networkTestInProgress = false;
 
 /**
  * Creates the main application window for Electron.
@@ -120,8 +163,14 @@ app.whenReady().then(() => {
   /**
    * IPC: Window management (minimize, maximize, close).
    */
-  ipcMain.on('window-controls', (event, command) => {
+  ipcMain.on('window-controls', (event, command: unknown) => {
     if (!mainWindow) return;
+
+    if (!isWindowCommand(command)) {
+      event.reply('test-error', 'Invalid window command received.');
+      return;
+    }
+
     switch (command) {
       case 'minimize':
         mainWindow.minimize();
@@ -143,9 +192,15 @@ app.whenReady().then(() => {
    * IPC: Launch network test.
    * @param profile - Profile containing targets and sample count
    */
-  ipcMain.on('start-network-test', async (event, profile) => {
-    const targets = Array.isArray(profile?.targets) ? profile.targets : [profile?.host || '8.8.8.8'];
-    const samples = typeof profile?.samples === 'number' ? profile.samples : 12;
+  ipcMain.on('start-network-test', async (event, profile: StartNetworkTestPayload | undefined) => {
+    if (networkTestInProgress) {
+      event.reply('test-error', 'A network test is already running. Please wait for completion.');
+      return;
+    }
+
+    // Single-flight guard prevents overlapping test runs and inconsistent progress streams.
+    const { targets, samples } = sanitizeStartTestPayload(profile);
+    networkTestInProgress = true;
 
     try {
       const results = await runNetworkTest(targets, samples, (payload) => {
@@ -157,6 +212,8 @@ app.whenReady().then(() => {
       event.reply('test-complete', results);
     } catch (e) {
       event.reply('test-error', (e as Error).message);
+    } finally {
+      networkTestInProgress = false;
     }
   });
 
@@ -165,11 +222,12 @@ app.whenReady().then(() => {
    * @param rawUrl - URL to open
    */
   ipcMain.handle('open-external', async (_event, rawUrl: string) => {
-    if (!isAllowedExternalUrl(rawUrl)) {
+    const cleanedUrl = String(rawUrl ?? '').trim();
+    if (!isAllowedExternalUrl(cleanedUrl)) {
       return { ok: false, error: 'Only http/https URLs are allowed.' };
     }
 
-    await shell.openExternal(rawUrl);
+    await shell.openExternal(cleanedUrl);
     return { ok: true };
   });
 
